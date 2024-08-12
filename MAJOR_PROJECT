@@ -1,0 +1,85 @@
+import matplotlib
+matplotlib.use('Agg')
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.ensemble import RandomForestClassifier
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load the dataset
+df = pd.read_csv('/content/heart.csv')
+
+# Check for missing values
+print(df.isnull().sum())
+
+# Handle missing values separately for numeric and non-numeric columns
+numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+non_numeric_cols = df.select_dtypes(exclude=['int64', 'float64']).columns
+df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+df[non_numeric_cols] = df[non_numeric_cols].fillna(df[non_numeric_cols].mode().iloc[0])
+
+# Check for duplicates
+print(df.duplicated().sum())
+
+# Remove duplicates (if any)
+df.drop_duplicates(inplace=True)
+
+# One-hot encoding for categorical variables
+df = pd.get_dummies(df, columns=['Sex', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope'])
+
+# Correlation matrix
+corr_matrix = df.corr()
+print(corr_matrix['HeartDisease'].sort_values(ascending=False))
+
+# Select top 10 features
+top_features = ['Age', 'RestingBP', 'Cholesterol', 'MaxHR', 'Oldpeak', 'FastingBS', 'RestingECG_Normal', 'ExerciseAngina_Y', 'ST_Slope_Up', 'Sex_M']
+df = df[top_features + ['HeartDisease']]
+
+# Split the dataset into training and testing sets
+X = df.drop('HeartDisease', axis=1)
+y = df['HeartDisease']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Initialize the model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+
+# Train the model
+model.fit(X_train, y_train)
+
+# Make predictions
+y_pred = model.predict(X_test)
+
+# Evaluate the model
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Classification Report:")
+print(classification_report(y_test, y_pred))
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+# Create a scatter plot
+plt.figure(figsize=(10, 6))
+scatter = plt.scatter(df['Age'], df['MaxHR'], c=df['HeartDisease'], cmap='viridis', alpha=0.6)
+plt.colorbar(scatter)
+plt.xlabel('Age')
+plt.ylabel('Max Heart Rate')
+plt.title('Age vs Max Heart Rate (Color: Heart Disease)')
+plt.savefig('heart_disease_scatter_plot.png')
+plt.close()
+
+# Feature importance
+feature_importance = pd.DataFrame({'feature': X.columns, 'importance': model.feature_importances_})
+feature_importance = feature_importance.sort_values('importance', ascending=False)
+print("\nFeature Importance:")
+print(feature_importance)
+
+# Plot feature importance
+plt.figure(figsize=(10, 6))
+sns.barplot(x='importance', y='feature', data=feature_importance)
+plt.title('Feature Importance')
+plt.xlabel('Importance')
+plt.ylabel('Feature')
+plt.savefig('feature_importance_plot.png')
+plt.close()
